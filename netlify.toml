@@ -1,0 +1,6 @@
+[build]
+  command = "npm run build"
+  # publish can be left default when using the plugin; if you use next export use "out"
+  
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
