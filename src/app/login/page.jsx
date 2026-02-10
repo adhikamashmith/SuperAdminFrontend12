@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState,useEffect } from "react";
 
 export default function Login() {
   
