@@ -5,13 +5,24 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function Login() {
+  
+  const router = useRouter();
+
+  // <-- Add this here
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      // User is already logged in, redirect to dashboard
+      router.replace("/dashboard");
+    }
+  }, []);
   const [payload, setPayload] = useState({
     email: "",
     password: "",
   });
   const [invalid, setInvalid] = useState(false);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  // const router = useRouter();
 
   const login = async (e) => {
     e.preventDefault();
@@ -60,7 +71,7 @@ export default function Login() {
         })
       );
 
-      return router.push("/");
+      return router.push("/dashboard");
     } catch (error) {
       // 5. Better Error Logging
       console.log(error,"line 66");
