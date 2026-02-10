@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Grid from "@/components/grid";
 import { getBearerToken } from "@/util";
 import axios from "axios";
@@ -13,6 +14,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import jwt_decode from "jwt-decode"; // optional if you want to check token expiration
 
 const getDashboard = async (setDashboard, setFetchingDashboard) => {
   setFetchingDashboard(true);
@@ -53,6 +55,30 @@ const getAllCompanies = async (setCompanies, setFetchingCompanies) => {
 };
 
 export default function Dashboard() {
+
+  const router = useRouter();
+
+  // ---- AUTH CHECK ----
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      router.replace("/login"); // redirect if not logged in
+      return;
+    }
+    try {
+      const payload = jwt_decode(token);
+      const now = Date.now() / 1000;
+      if (payload.exp < now) {
+        // token expired
+        localStorage.removeItem("access_token");
+        router.replace("/login");
+      }
+    } catch (err) {
+      router.replace("/login");
+    }
+  }, []);
+
+  
   const [companies, setCompanies] = useState([]);
   const [fetchingCompanies, setFetchingCompanies] = useState(true);
 
