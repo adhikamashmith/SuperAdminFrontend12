@@ -77,8 +77,15 @@ export default function CreateCompanyPage() {
         setShowCreatedCompanyModal(false);
       }, 3000);
     } catch (error) {
-      alert("Some error occured");
       console.error("Error creating company:", error);
+
+      const message =
+        error?.response?.data?.detail?.message || // standardized backend
+        error?.response?.data?.detail ||          // legacy backend
+        error?.response?.data?.message ||
+        "Something went wrong. Please try again.";
+
+      alert(message);
     } finally {
       setCreatingCompany(false);
     }
