@@ -4,7 +4,7 @@ import { countries, getBearerToken, isValidEmail } from "@/util";
 import axios from "axios";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { IoIosArrowBack, IoIosClose, IoMdClose } from "react-icons/io";
+import { IoIosArrowBack, IoIosClose } from "react-icons/io";
 import { MdEdit } from "react-icons/md";
 import { FaCheck, FaFile } from "react-icons/fa";
 import { LuFilePlus2 } from "react-icons/lu";
@@ -12,6 +12,8 @@ import dynamic from "next/dynamic";
 const Select = dynamic(() => import("react-select"), { ssr: false });
 
 import { useParams, useRouter } from "next/navigation";
+
+// --- Data Fetching Functions ---
 
 const getAllPlans = async (setPlans, setFetchingPlans) => {
   setFetchingPlans(true);
@@ -26,7 +28,7 @@ const getAllPlans = async (setPlans, setFetchingPlans) => {
     );
     setPlans(response.data);
   } catch (error) {
-    console.error("Error fetching companies:", error);
+    console.error("Error fetching plans:", error);
   } finally {
     setFetchingPlans(false);
   }
@@ -69,6 +71,7 @@ const loadPaylod = async (
 export default function CompanyDetailsPage() {
   const { company_name } = useParams();
   const router = useRouter();
+  
   const [company, setCompany] = useState({
     company_name: "",
     admin_name: "",
@@ -81,119 +84,77 @@ export default function CompanyDetailsPage() {
     client_documents: [],
     company_documents: [],
   });
-  const [fetchingCompany, setFetchingCompany] = useState(true);
 
   const [plans, setPlans] = useState([]);
+  const [fetchingCompany, setFetchingCompany] = useState(true);
   const [fetchingPlans, setFetchingPlans] = useState(true);
-
   const [updatingCompany, setUpdatingCompany] = useState(false);
+  const [renewingPlan, setRenewingPlan] = useState(false);
   const [showUpdatedCompanyModal, setShowUpdatedCompanyModal] = useState(false);
-
-  const [isDeletingDocument, setIsDeletingDocument] = useState(false);
-
   const [isEditing, setIsEditing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  
+  // State to hold the selected plan in the Renew section
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
   const clientFileInputRef = useRef(null);
   const companyFileInputRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (!company_name) return;
+    loadPaylod(company_name, setCompany, setFetchingCompany, setPlans, setFetchingPlans);
+  }, [company_name]);
+
+  // Sync selectedPlan state when company data loads
+  useEffect(() => {
+    if (company.plan_name) {
+      setSelectedPlan({ label: company.plan_name, value: company.plan_name });
+    }
+  }, [company.plan_name]);
 
   const handleAddClick = (type) => {
     if (type === "client") clientFileInputRef.current?.click();
     else companyFileInputRef.current?.click();
   };
 
-  const uploadClientDocument = async (company_name, title, file) => {
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("file", file);
-
-    return axios.post(
-      `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}/client-document`,
-      formData,
-      {
-        headers: {
-          Authorization: await getBearerToken(),
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-  };
-
-  const uploadCompanyDocument = async (company_name, title, file) => {
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("file", file);
-
-    return axios.post(
-      `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}/company-document`,
-      formData,
-      {
-        headers: {
-          Authorization: await getBearerToken(),
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-  };
-
   const handleFileChange = async (e, type) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const title = file.name;
+    const formData = new FormData();
+    formData.append("title", file.name);
+    formData.append("file", file);
 
     try {
       setUploading(true);
-      if (type === "client") await uploadClientDocument(company_name, title, file);
-      else await uploadCompanyDocument(company_name, title, file);
-
+      const endpoint = type === "client" ? "client-document" : "company-document";
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}/${endpoint}`,
+        formData,
+        {
+          headers: {
+            Authorization: await getBearerToken(),
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
       await getCompany(company_name, setCompany, setFetchingCompany);
     } catch (err) {
-      console.error("Upload failed", err);
-      alert("Failed to upload document");
+      alert("Upload failed");
     } finally {
       setUploading(false);
-      e.target.value = "";
     }
   };
 
-  useEffect(() => {
-    if (!company_name) return;
-
-    loadPaylod(
-      company_name,
-      setCompany,
-      setFetchingCompany,
-      setPlans,
-      setFetchingPlans
-    );
-  }, [company_name]);
-
-  /* 🔥 UPDATED: updateCompany function to send only specific fields */
+  // --- LOGIC: UPDATE PROFILE (Admin details, Status, Dates) ---
   const updateCompany = async () => {
-    const requiredFields = [
-      "admin_name",
-      "admin_email",
-      "country",
-      "status",
-      "start_date",
-      "end_date",
-    ];
-
+    const requiredFields = ["admin_name", "admin_email", "country", "status", "start_date", "end_date"];
     for (const key of requiredFields) {
-      if (!company[key] || !company[key].toString().trim()) {
-        return alert("Please fill all the fields");
-      }
-
-      if (key === "admin_email" && !isValidEmail(company[key])) {
-        return alert("Please fill a valid email");
-      }
+      if (!company[key]) return alert(`Please fill ${key}`);
     }
 
     setUpdatingCompany(true);
-
     try {
-      /* 🔥 Only sending allowed fields to DB */
+      // Strictly profile fields only
       const payload = {
         admin_name: company.admin_name,
         admin_email: company.admin_email,
@@ -206,397 +167,242 @@ export default function CompanyDetailsPage() {
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}`,
         payload,
-        {
-          headers: {
-            Authorization: await getBearerToken(),
-          },
-        }
+        { headers: { Authorization: await getBearerToken() } }
       );
 
       setCompany(response.data);
       setShowUpdatedCompanyModal(true);
-      setIsEditing(false); // Switch back to view mode
-
-      setTimeout(() => {
-        setShowUpdatedCompanyModal(false);
-      }, 2000);
-
+      setIsEditing(false);
+      setTimeout(() => setShowUpdatedCompanyModal(false), 2000);
     } catch (error) {
-      alert("Some error occured");
-      console.error("Error updating company:", error);
+      alert("Error updating details");
     } finally {
       setUpdatingCompany(false);
     }
   };
 
-  const deleteClientDocument = async (document_id) => {
-    setIsDeletingDocument(true);
+  // --- LOGIC: RENEW / CHANGE PLAN ONLY ---
+  const handleRenewPlan = async () => {
+    if (!selectedPlan) return alert("Please select a plan");
+    setRenewingPlan(true);
     try {
-      if (confirm("Are you sure you want to delete this document?")) {
-        await axios.delete(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}/client-document/${document_id}`,
-          {
-            headers: {
-              Authorization: await getBearerToken(),
-            },
-          }
-        );
-        getCompany(company_name, setCompany, setFetchingCompany);
-      } else return;
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}/renew`,
+        { plan_name: selectedPlan.value },
+        { headers: { Authorization: await getBearerToken() } }
+      );
+      alert("Plan updated successfully!");
+      getCompany(company_name, setCompany, setFetchingCompany);
     } catch (error) {
-      alert("Some error occured");
+      alert("Failed to renew plan");
     } finally {
-      setIsDeletingDocument(false);
+      setRenewingPlan(false);
     }
   };
 
-  const deleteCompanyDocument = async (document_id) => {
-    setIsDeletingDocument(true);
+  const deleteDocument = async (type, id) => {
+    if (!confirm("Delete this document?")) return;
     try {
-      if (confirm("Are you sure you want to delete this document?")) {
-        await axios.delete(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}/company-document/${document_id}`,
-          {
-            headers: {
-              Authorization: await getBearerToken(),
-            },
-          }
-        );
-        getCompany(company_name, setCompany, setFetchingCompany);
-      } else return;
+      const endpoint = type === "client" ? "client-document" : "company-document";
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}/${endpoint}/${id}`,
+        { headers: { Authorization: await getBearerToken() } }
+      );
+      getCompany(company_name, setCompany, setFetchingCompany);
     } catch (error) {
-      alert("Some error occured");
-    } finally {
-      setIsDeletingDocument(false);
+      alert("Delete failed");
     }
   };
 
-  const loading = fetchingCompany || fetchingPlans || updatingCompany;
+  if (fetchingCompany) return <div className="p-10 text-center">Loading...</div>;
 
   return (
     <div className="w-full h-full flex flex-col p-6 px-10 text-gray-700 bg-white">
       {showUpdatedCompanyModal && (
-        <div className="absolute top-0 left-0 w-screen h-screen flex place-items-center justify-center bg-black/20 z-50">
-          <div className="w-120 h-60 flex flex-col place-items-center justify-center bg-white rounded-xl shadow-lg">
-            <div className="w-16 h-16 rounded-full bg-linear-to-r from-[#1B6687] to-[#209CBB] flex place-items-center justify-center mb-8">
-              <FaCheck size={30} className="text-white" />
-            </div>
-            <p className="font-semibold text-lg">
-              Company Updated Successfully!!
-            </p>
+        <div className="fixed inset-0 flex items-center justify-center bg-black/20 z-50">
+          <div className="w-96 p-10 bg-white rounded-xl text-center shadow-xl">
+            <FaCheck size={40} className="mx-auto text-[#1B6687] mb-4" />
+            <p className="text-lg font-bold">Company Updated Successfully!</p>
           </div>
         </div>
       )}
 
-      <div className="w-full flex place-items-center gap-x-2 mb-4">
-        <Link href="/dashboard/companies">
-          <IoIosArrowBack size={25} />
-        </Link>
-        <p className="text-xl font-bold">{company.company_name ?? "Loading..."}</p>
+      <div className="w-full flex items-center gap-x-2 mb-6">
+        <Link href="/dashboard/companies"><IoIosArrowBack size={25} /></Link>
+        <p className="text-xl font-bold">{company.company_name}</p>
       </div>
-      <p className="mb-4">View all details about the company here</p>
 
-      <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
-        <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
-          <p className="font-semibold">
-            Company Details{" "}
-            <span className="text-sm font-normal">
-              ({isEditing ? "Editing" : "View"} Mode)
-            </span>
-          </p>
+      {/* --- DIV 1: COMPANY PROFILE DETAILS --- */}
+      <div className="w-full rounded-xl p-6 border border-gray-200 shadow-sm mb-6 bg-white">
+        <div className="flex justify-between items-center mb-8 pb-3 border-b border-gray-300">
+          <p className="font-bold text-[#1B6687]">1. Company Information</p>
           {!isEditing && (
-            <MdEdit
-              size={25}
-              className="cursor-pointer text-blue-500 hover:text-blue-700"
-              onClick={() => setIsEditing(true)}
-            />
+            <button onClick={() => setIsEditing(true)} className="flex items-center gap-1 text-blue-600 font-medium">
+              <MdEdit size={20} /> Edit Details
+            </button>
           )}
         </div>
 
-        <div className="grid grid-cols-2 justify-between gap-10">
-          {/* 🔥 Company Name - Strictly Read Only */}
-          <Field
-            loading={true} 
-            title="Company Name"
-            value={company.company_name}
-          />
-
-          {/* 🔥 Plan Name - Read Only here (Changed via Renew) */}
-          <Field
-            loading={true}
-            title="Current Plan"
-            value={company.plan_name}
-          />
+        <div className="grid grid-cols-2 gap-10">
+          {/* Company Name: Readable but un-editable. No dark background. */}
+          <div>
+            <p className="font-semibold mb-2">Company Name</p>
+            <div className="w-full p-3 rounded-lg border border-transparent bg-white text-gray-900 font-medium">
+              {company.company_name}
+            </div>
+          </div>
 
           <Field
-            loading={!isEditing || loading}
+            loading={!isEditing || updatingCompany}
             title="Admin Name"
             value={company.admin_name}
-            onChange={(e) =>
-              setCompany((old) => ({ ...old, admin_name: e.target.value }))
-            }
+            onChange={(e) => setCompany({ ...company, admin_name: e.target.value })}
           />
           <Field
-            loading={!isEditing || loading}
-            type="email"
+            loading={!isEditing || updatingCompany}
             title="Admin Email"
             value={company.admin_email}
-            onChange={(e) =>
-              setCompany((old) => ({ ...old, admin_email: e.target.value }))
-            }
+            onChange={(e) => setCompany({ ...company, admin_email: e.target.value })}
           />
           <Dropdown
-            loading={!isEditing || loading}
+            loading={!isEditing || updatingCompany}
             title="Country"
             options={countries.map((c) => ({ label: c.name, value: c.name }))}
-            value={
-              company.country
-                ? { label: company.country, value: company.country }
-                : null
-            }
-            onChange={(option) =>
-              setCompany((old) => ({ ...old, country: option?.value }))
-            }
-            placeholder="Select Country"
+            value={company.country ? { label: company.country, value: company.country } : null}
+            onChange={(opt) => setCompany({ ...company, country: opt?.value })}
           />
           <Dropdown
-            loading={!isEditing || loading}
+            loading={!isEditing || updatingCompany}
             title="Status"
-            options={[
-              { label: "Active", value: "Active" },
-              { label: "In Progress", value: "In Progress" },
-              { label: "Inactive", value: "Inactive" },
-            ]}
-            value={
-              company.status
-                ? {
-                    label: company.status,
-                    value: company.status,
-                  }
-                : null
-            }
-            onChange={(option) =>
-              setCompany((old) => ({ ...old, status: option?.value }))
-            }
-            placeholder="Select Status"
+            options={[{ label: "Active", value: "Active" }, { label: "Inactive", value: "Inactive" }]}
+            value={company.status ? { label: company.status, value: company.status } : null}
+            onChange={(opt) => setCompany({ ...company, status: opt?.value })}
           />
           <Field
-            loading={!isEditing || loading}
             type="date"
+            loading={!isEditing || updatingCompany}
             title="Start Date"
             value={company.start_date?.split("T")[0] || ""}
-            onChange={(e) =>
-              setCompany((old) => ({ ...old, start_date: e.target.value }))
-            }
+            onChange={(e) => setCompany({ ...company, start_date: e.target.value })}
           />
           <Field
-            loading={!isEditing || loading}
             type="date"
+            loading={!isEditing || updatingCompany}
             title="End Date"
             value={company.end_date?.split("T")[0] || ""}
-            onChange={(e) =>
-              setCompany((old) => ({ ...old, end_date: e.target.value }))
-            }
+            onChange={(e) => setCompany({ ...company, end_date: e.target.value })}
           />
         </div>
+
+        {isEditing && (
+          <div className="flex justify-end gap-x-4 mt-8 pt-4 border-t">
+            <button onClick={() => { setIsEditing(false); window.location.reload(); }} className="px-8 py-2 border border-gray-400 rounded-lg">Cancel</button>
+            <button onClick={updateCompany} className="px-8 py-2 bg-[#1B6687] text-white rounded-lg">Update Details</button>
+          </div>
+        )}
       </div>
 
-      {/* EDIT MODE BUTTONS */}
-      {isEditing && (
-        <div className="w-full flex place-items-center justify-end gap-x-6 pr-4">
+      {/* --- DIV 2: PLAN MANAGEMENT (RENEW) --- */}
+      <div className="w-full rounded-xl p-6 border border-blue-100 shadow-sm mb-6 bg-[#F8FAFC]">
+        <div className="mb-8 pb-3 border-b border-blue-200">
+          <p className="font-bold text-[#1B6687]">2. Subscription Plan Management</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-10 items-end">
+          <Dropdown
+            loading={renewingPlan}
+            title="Select Plan to Change/Renew"
+            options={plans.map((p) => ({ label: p.plan_name, value: p.plan_name }))}
+            value={selectedPlan}
+            onChange={(opt) => setSelectedPlan(opt)}
+          />
+
           <button
-            className="w-40 p-3 rounded-lg bg-white border border-gray-400 text-gray-600 text-center cursor-pointer hover:bg-gray-50"
-            onClick={() => {
-              setIsEditing(false);
-              getCompany(company_name, setCompany, setFetchingCompany);
-            }}
+            onClick={handleRenewPlan}
+            disabled={renewingPlan}
+            className="h-[50px] bg-gradient-to-r from-[#1B6687] to-[#209CBB] text-white rounded-lg font-bold shadow-md hover:opacity-90 disabled:opacity-50 transition-all"
           >
-            Cancel
-          </button>
-          <button
-            disabled={loading}
-            onClick={updateCompany}
-            className="w-40 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer disabled:opacity-50"
-          >
-            {updatingCompany ? "Updating..." : "Update Company"}
+            {renewingPlan ? "Processing..." : "Renew / Change Plan"}
           </button>
         </div>
-      )}
+        <p className="mt-4 text-xs text-gray-500 italic">* Note: Plan changes take effect immediately and may update the expiry date.</p>
+      </div>
 
-      {/* VIEW MODE SECTION */}
-      {!isEditing && (
-        <div className="w-full">
-          {/* 🔥 RENEW PLAN BUTTON */}
-          <div className="w-full flex justify-end mb-4 pr-4">
-            <button
-              onClick={() =>
-                router.push(`/dashboard/companies/${company_name}/renew`)
-              }
-              className="w-48 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer shadow hover:opacity-90"
-            >
-              Change / Renew Plan
-            </button>
-          </div>
-
-          {/* CLIENT DOCUMENTS */}
-          <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
-            <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
-              <p className="font-semibold">Client Documents</p>
-              <div
-                className="cursor-pointer text-blue-600 hover:opacity-80"
-                onClick={() => handleAddClick("client")}
-              >
-                <LuFilePlus2 size={25} />
-                <input
-                  ref={clientFileInputRef}
-                  type="file"
-                  hidden
-                  onChange={(e) => handleFileChange(e, "client")}
-                />
-              </div>
-            </div>
-
-            <div className="w-full flex place-items-center gap-x-4 overflow-x-auto pb-4">
-              {fetchingCompany && "Loading..."}
-              {company.client_documents?.length === 0 && <p className="text-sm text-gray-400">No Documents</p>}
-              {company.client_documents.map(
-                ({ title, document_id, s3_url, created_at }) => (
-                  <div
-                    key={document_id}
-                    className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative group"
-                  >
-                    <IoIosClose
-                      size={35}
-                      className="absolute top-1 right-1 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => deleteClientDocument(document_id)}
-                    />
-                    <div
-                      onClick={() => window.open(s3_url)}
-                      className="flex flex-col place-items-center"
-                    >
-                      <FaFile size={60} className="mb-2 text-gray-400" />
-                      <p className="max-w-40 truncate text-sm font-medium">{title}</p>
-                      <p className="text-[10px] text-gray-500">
-                        Uploaded{" "}
-                        {new Date(created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-
-          {/* COMPANY DOCUMENTS */}
-          <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
-            <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
-              <p className="font-semibold">Company Documents</p>
-              <div
-                className="cursor-pointer text-blue-600 hover:opacity-80"
-                onClick={() => handleAddClick("company")}
-              >
-                <LuFilePlus2 size={25} />
-                <input
-                  ref={companyFileInputRef}
-                  type="file"
-                  hidden
-                  onChange={(e) => handleFileChange(e, "company")}
-                />
-              </div>
-            </div>
-
-            <div className="w-full flex place-items-center gap-x-4 overflow-x-auto pb-4">
-              {fetchingCompany && "Loading..."}
-              {company.company_documents?.length === 0 && <p className="text-sm text-gray-400">No Documents</p>}
-              {company.company_documents.map(
-                ({ title, document_id, s3_url, created_at }) => (
-                  <div
-                    key={document_id}
-                    className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative group"
-                  >
-                    <IoIosClose
-                      size={35}
-                      className="absolute top-1 right-1 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => deleteCompanyDocument(document_id)}
-                    />
-                    <div
-                      onClick={() => window.open(s3_url)}
-                      className="flex flex-col place-items-center"
-                    >
-                      <FaFile size={60} className="mb-2 text-gray-400" />
-                      <p className="max-w-40 truncate text-sm font-medium">{title}</p>
-                      <p className="text-[10px] text-gray-500">
-                        Uploaded{" "}
-                        {new Date(created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* --- DIV 3: DOCUMENTS --- */}
+      <div className="space-y-6">
+        <DocumentSection
+          title="Client Documents"
+          docs={company.client_documents}
+          onAdd={() => handleAddClick("client")}
+          onDelete={(id) => deleteDocument("client", id)}
+          fileRef={clientFileInputRef}
+          onFileChange={(e) => handleFileChange(e, "client")}
+        />
+        <DocumentSection
+          title="Company Documents"
+          docs={company.company_documents}
+          onAdd={() => handleAddClick("company")}
+          onDelete={(id) => deleteDocument("company", id)}
+          fileRef={companyFileInputRef}
+          onFileChange={(e) => handleFileChange(e, "company")}
+        />
+      </div>
     </div>
   );
 }
 
-export const Field = ({ type = "text", title, value, onChange, loading }) => {
-  return (
-    <div>
-      <p className="font-semibold mb-2">{title}</p>
-      <input
-        disabled={loading}
-        type={type}
-        value={value}
-        onChange={onChange}
-        className="w-full border border-gray-300 p-3 rounded-lg outline-none focus:border-gray-500 bg-[#1F9EBD0F] disabled:bg-gray-100 disabled:text-gray-500"
-        placeholder={"Enter " + title}
-      />
-    </div>
-  );
-};
+// --- Internal UI Components ---
 
-export const Dropdown = ({ title, value, onChange, options, loading }) => {
-  const selectStyles = {
-    control: (base, state) => ({
+const Field = ({ type = "text", title, value, onChange, loading }) => (
+  <div>
+    <p className="font-semibold mb-2">{title}</p>
+    <input
+      disabled={loading}
+      type={type}
+      value={value}
+      onChange={onChange}
+      className={`w-full border border-gray-300 p-3 rounded-lg outline-none focus:border-[#1B6687] ${
+        loading ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-[#1F9EBD0F]"
+      }`}
+      placeholder={"Enter " + title}
+    />
+  </div>
+);
+
+const Dropdown = ({ title, value, onChange, options, loading }) => {
+  const styles = {
+    control: (base) => ({
       ...base,
-      width: "100%",
       minHeight: "48px",
-      padding: "0 4px",
-      backgroundColor: state.isDisabled ? "#F3F4F6" : "#1F9EBD0F",
-      borderColor: state.isFocused ? "#6B7280" : "#D1D5DB",
-      borderWidth: "1px",
       borderRadius: "0.5rem",
-      boxShadow: "none",
-      "&:hover": {
-        borderColor: "#6B7280",
-      },
-    }),
-    valueContainer: (base) => ({
-      ...base,
-      padding: "0.75rem",
-    }),
-    placeholder: (base) => ({
-      ...base,
-      color: "#9CA3AF",
-    }),
-    singleValue: (base) => ({
-      ...base,
-      color: "#374151",
+      backgroundColor: loading ? "#F9FAFB" : "#1F9EBD0F",
+      border: "1px solid #D1D5DB",
     }),
   };
   return (
     <div>
       <p className="font-semibold mb-2">{title}</p>
-      <Select
-        isDisabled={loading}
-        styles={selectStyles}
-        options={options}
-        value={value}
-        onChange={onChange}
-        placeholder={"Select " + title}
-      />
+      <Select isDisabled={loading} styles={styles} options={options} value={value} onChange={onChange} />
     </div>
   );
 };
+
+const DocumentSection = ({ title, docs, onAdd, onDelete, fileRef, onFileChange }) => (
+  <div className="w-full rounded-xl p-6 border border-gray-200 shadow-sm bg-white">
+    <div className="flex justify-between items-center mb-6 border-b pb-2">
+      <p className="font-bold">{title}</p>
+      <button onClick={onAdd} className="text-blue-600"><LuFilePlus2 size={25} /></button>
+      <input ref={fileRef} type="file" hidden onChange={onFileChange} />
+    </div>
+    <div className="flex gap-4 overflow-x-auto pb-2">
+      {docs?.length === 0 && <p className="text-sm text-gray-400">No documents uploaded.</p>}
+      {docs?.map((doc) => (
+        <div key={doc.document_id} className="min-w-[150px] p-4 border rounded-xl flex flex-col items-center relative group bg-gray-50">
+          <IoIosClose size={24} className="absolute top-1 right-1 text-red-500 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => onDelete(doc.document_id)} />
+          <FaFile size={40} className="text-gray-400 mb-2" />
+          <p className="text-xs font-medium text-center truncate w-full">{doc.title}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+);
