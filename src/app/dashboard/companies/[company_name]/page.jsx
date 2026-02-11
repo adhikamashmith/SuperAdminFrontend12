@@ -170,32 +170,67 @@ export default function CompanyDetailsPage() {
 
 
 
+    /* 🔥 UPDATED: updateCompany function */
   const updateCompany = async () => {
-    for (const key of Object.keys(company)) {
-      if (key === "client_documents" || key === "company_documents") continue;
-      if (!company[key].trim()) return alert("Please fill all the fields");
-      if (key === "admin_email" && !isValidEmail(company[key]))
+
+    /* 🔥 UPDATED: Validate only editable fields */
+    const requiredFields = [
+      "admin_name",
+      "admin_email",
+      "country",
+      "status",
+      "start_date",
+      "end_date",
+    ];
+
+    for (const key of requiredFields) {
+      if (!company[key] || !company[key].toString().trim()) {
+        return alert("Please fill all the fields");
+      }
+
+      if (key === "admin_email" && !isValidEmail(company[key])) {
         return alert("Please fill a valid email");
+      }
     }
+
     setUpdatingCompany(true);
+
     try {
+
+      /* 🔥 UPDATED: Only send allowed fields
+         ❌ company_name removed
+         ❌ plan_name removed
+         ❌ documents removed
+      */
+      const payload = {
+        admin_name: company.admin_name,
+        admin_email: company.admin_email,
+        country: company.country,
+        status: company.status,
+        start_date: company.start_date,
+        end_date: company.end_date,
+      };
+
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}`,
-        company,
+        payload,   /* 🔥 UPDATED: sending payload instead of full company object */
         {
           headers: {
             Authorization: await getBearerToken(),
           },
         }
       );
+
       setCompany(response.data);
       setShowUpdatedCompanyModal(true);
+
       setTimeout(() => {
         setShowUpdatedCompanyModal(false);
       }, 2000);
+
     } catch (error) {
       alert("Some error occured");
-      console.error("Error creating company:", error);
+      console.error("Error updating company:", error);
     } finally {
       setUpdatingCompany(false);
     }
@@ -284,12 +319,9 @@ export default function CompanyDetailsPage() {
         </div>
         <div className="grid grid-cols-2 justify-between gap-10">
           <Field
-            loading={loading}
+            loading={true}   // always disabled
             title="Company Name"
             value={company.company_name}
-            onChange={(e) =>
-              setCompany((old) => ({ ...old, company_name: e.target.value }))
-            }
           />
           <Field
             loading={loading}
@@ -322,23 +354,6 @@ export default function CompanyDetailsPage() {
             }
             placeholder="Select Country"
           />
-          <Dropdown
-              loading={loading}
-              title="Plan Selection"
-              options={plans.map((plan) => ({
-                label: plan.plan_name,
-                value: plan.plan_name,
-              }))}
-              value={
-                company?.plan_name
-                  ? { label: company.plan_name, value: company.plan_name }
-                  : null
-              }
-              onChange={(option) =>
-                setCompany((old) => ({ ...old, plan_name: option?.value }))
-              }
-            />
-
           <Dropdown
             loading={loading}
             title="Status"
@@ -381,6 +396,22 @@ export default function CompanyDetailsPage() {
           />
         </div>
       </div>
+      {!isEditing && (
+        <div>
+      
+          {/* 🔥 ADD THIS BUTTON RIGHT HERE */}
+          <div className="w-full flex justify-end mb-4">
+            <button
+              onClick={() =>
+                router.push(`/dashboard/companies/${company_name}/renew`)
+              }
+              className="w-48 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer"
+            >
+              Change / Renew Plan
+            </button>
+          </div>
+      
+          <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
       {isEditing && (
         <div className="w-full flex place-items-center justify-end gap-x-6">
           <button
