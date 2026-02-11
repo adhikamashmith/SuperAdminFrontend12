@@ -89,7 +89,7 @@ export default function CompanyDetailsPage() {
   const [updatingCompany, setUpdatingCompany] = useState(false);
   const [showUpdatedCompanyModal, setShowUpdatedCompanyModal] = useState(false);
 
-  const [isDeletingDocument, setIsDeletingDocument] = useState(true);
+  const [isDeletingDocument, setIsDeletingDocument] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
 
@@ -158,23 +158,19 @@ export default function CompanyDetailsPage() {
   };
 
   useEffect(() => {
-  if (!company_name) return;
+    if (!company_name) return;
 
-  loadPaylod(
-    company_name,
-    setCompany,
-    setFetchingCompany,
-    setPlans,
-    setFetchingPlans
-  );
-}, [company_name]);
+    loadPaylod(
+      company_name,
+      setCompany,
+      setFetchingCompany,
+      setPlans,
+      setFetchingPlans
+    );
+  }, [company_name]);
 
-
-
-    /* 🔥 UPDATED: updateCompany function */
+  /* 🔥 UPDATED: updateCompany function to send only specific fields */
   const updateCompany = async () => {
-
-    /* 🔥 UPDATED: Validate only editable fields */
     const requiredFields = [
       "admin_name",
       "admin_email",
@@ -197,12 +193,7 @@ export default function CompanyDetailsPage() {
     setUpdatingCompany(true);
 
     try {
-
-      /* 🔥 UPDATED: Only send allowed fields
-         ❌ company_name removed
-         ❌ plan_name removed
-         ❌ documents removed
-      */
+      /* 🔥 Only sending allowed fields to DB */
       const payload = {
         admin_name: company.admin_name,
         admin_email: company.admin_email,
@@ -214,7 +205,7 @@ export default function CompanyDetailsPage() {
 
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}`,
-        payload,   /* 🔥 UPDATED: sending payload instead of full company object */
+        payload,
         {
           headers: {
             Authorization: await getBearerToken(),
@@ -224,6 +215,7 @@ export default function CompanyDetailsPage() {
 
       setCompany(response.data);
       setShowUpdatedCompanyModal(true);
+      setIsEditing(false); // Switch back to view mode
 
       setTimeout(() => {
         setShowUpdatedCompanyModal(false);
@@ -244,10 +236,10 @@ export default function CompanyDetailsPage() {
         await axios.delete(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}/client-document/${document_id}`,
           {
-          headers: {
-            Authorization: await getBearerToken(),
-          },
-         }
+            headers: {
+              Authorization: await getBearerToken(),
+            },
+          }
         );
         getCompany(company_name, setCompany, setFetchingCompany);
       } else return;
@@ -257,6 +249,7 @@ export default function CompanyDetailsPage() {
       setIsDeletingDocument(false);
     }
   };
+
   const deleteCompanyDocument = async (document_id) => {
     setIsDeletingDocument(true);
     try {
@@ -264,10 +257,10 @@ export default function CompanyDetailsPage() {
         await axios.delete(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/company/${company_name}/company-document/${document_id}`,
           {
-          headers: {
-            Authorization: await getBearerToken(),
-          },
-        }
+            headers: {
+              Authorization: await getBearerToken(),
+            },
+          }
         );
         getCompany(company_name, setCompany, setFetchingCompany);
       } else return;
@@ -278,14 +271,13 @@ export default function CompanyDetailsPage() {
     }
   };
 
-  const loading =
-    fetchingCompany || fetchingPlans || updatingCompany || !isEditing;
+  const loading = fetchingCompany || fetchingPlans || updatingCompany;
 
   return (
     <div className="w-full h-full flex flex-col p-6 px-10 text-gray-700 bg-white">
       {showUpdatedCompanyModal && (
-        <div className="absolute top-0 left-0 w-screen h-screen flex place-items-center justify-center bg-black/20 z-10">
-          <div className="w-120 h-60 flex flex-col place-items-center justify-center bg-white rounded-xl">
+        <div className="absolute top-0 left-0 w-screen h-screen flex place-items-center justify-center bg-black/20 z-50">
+          <div className="w-120 h-60 flex flex-col place-items-center justify-center bg-white rounded-xl shadow-lg">
             <div className="w-16 h-16 rounded-full bg-linear-to-r from-[#1B6687] to-[#209CBB] flex place-items-center justify-center mb-8">
               <FaCheck size={30} className="text-white" />
             </div>
@@ -295,37 +287,49 @@ export default function CompanyDetailsPage() {
           </div>
         </div>
       )}
+
       <div className="w-full flex place-items-center gap-x-2 mb-4">
         <Link href="/dashboard/companies">
           <IoIosArrowBack size={25} />
         </Link>
-        <p className="text-xl">{company.company_name ?? "Loading..."}</p>
+        <p className="text-xl font-bold">{company.company_name ?? "Loading..."}</p>
       </div>
       <p className="mb-4">View all details about the company here</p>
+
       <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
         <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
-          <p>
+          <p className="font-semibold">
             Company Details{" "}
-            <span className="text-sm">
+            <span className="text-sm font-normal">
               ({isEditing ? "Editing" : "View"} Mode)
             </span>
           </p>
           {!isEditing && (
             <MdEdit
               size={25}
-              className="cursor-pointer"
+              className="cursor-pointer text-blue-500 hover:text-blue-700"
               onClick={() => setIsEditing(true)}
             />
           )}
         </div>
+
         <div className="grid grid-cols-2 justify-between gap-10">
+          {/* 🔥 Company Name - Strictly Read Only */}
           <Field
-            loading={true}   // always disabled
+            loading={true} 
             title="Company Name"
             value={company.company_name}
           />
+
+          {/* 🔥 Plan Name - Read Only here (Changed via Renew) */}
           <Field
-            loading={loading}
+            loading={true}
+            title="Current Plan"
+            value={company.plan_name}
+          />
+
+          <Field
+            loading={!isEditing || loading}
             title="Admin Name"
             value={company.admin_name}
             onChange={(e) =>
@@ -333,7 +337,7 @@ export default function CompanyDetailsPage() {
             }
           />
           <Field
-            loading={loading}
+            loading={!isEditing || loading}
             type="email"
             title="Admin Email"
             value={company.admin_email}
@@ -342,7 +346,7 @@ export default function CompanyDetailsPage() {
             }
           />
           <Dropdown
-            loading={loading}
+            loading={!isEditing || loading}
             title="Country"
             options={countries.map((c) => ({ label: c.name, value: c.name }))}
             value={
@@ -356,13 +360,12 @@ export default function CompanyDetailsPage() {
             placeholder="Select Country"
           />
           <Dropdown
-            loading={loading}
+            loading={!isEditing || loading}
             title="Status"
             options={[
               { label: "Active", value: "Active" },
               { label: "In Progress", value: "In Progress" },
               { label: "Inactive", value: "Inactive" },
-              { label: "Some Other Status", value: "Some Other Status" },
             ]}
             value={
               company.status
@@ -378,7 +381,7 @@ export default function CompanyDetailsPage() {
             placeholder="Select Status"
           />
           <Field
-            loading={loading}
+            loading={!isEditing || loading}
             type="date"
             title="Start Date"
             value={company.start_date?.split("T")[0] || ""}
@@ -387,7 +390,7 @@ export default function CompanyDetailsPage() {
             }
           />
           <Field
-            loading={loading}
+            loading={!isEditing || loading}
             type="date"
             title="End Date"
             value={company.end_date?.split("T")[0] || ""}
@@ -398,146 +401,96 @@ export default function CompanyDetailsPage() {
         </div>
       </div>
 
-    {/* EDIT MODE BUTTONS */}
-    {isEditing && (
-      <div className="w-full flex place-items-center justify-end gap-x-6">
-        <button
-          className="w-40 p-3 rounded-lg bg-white border border-[#209CBB] text-[#0e7893] text-center cursor-pointer"
-          onClick={() => {
-            setIsEditing(false);
-            window.location.reload();
-          }}
-        >
-          Cancel
-        </button>
-        <button
-          disabled={loading}
-          onClick={updateCompany}
-          className="w-40 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer"
-        >
-          Update Company
-        </button>
-      </div>
-    )}
-    
-    {/* VIEW MODE SECTION */}
-    {!isEditing && (
-      <div>
-    
-        {/* 🔥 CHANGE / RENEW PLAN BUTTON */}
-        <div className="w-full flex justify-end mb-4">
+      {/* EDIT MODE BUTTONS */}
+      {isEditing && (
+        <div className="w-full flex place-items-center justify-end gap-x-6 pr-4">
           <button
-            onClick={() =>
-              router.push(`/dashboard/companies/${company_name}/renew`)
-            }
-            className="w-48 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer"
+            className="w-40 p-3 rounded-lg bg-white border border-gray-400 text-gray-600 text-center cursor-pointer hover:bg-gray-50"
+            onClick={() => {
+              setIsEditing(false);
+              getCompany(company_name, setCompany, setFetchingCompany);
+            }}
           >
-            Change / Renew Plan
+            Cancel
+          </button>
+          <button
+            disabled={loading}
+            onClick={updateCompany}
+            className="w-40 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer disabled:opacity-50"
+          >
+            {updatingCompany ? "Updating..." : "Update Company"}
           </button>
         </div>
-    
-        {/* CLIENT DOCUMENTS */}
-        <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
-          <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
-            <p>Client Documents</p>
-            <div
-              className="cursor-pointer text-blue-600 hover:opacity-80"
-              onClick={() => handleAddClick("client")}
-            >
-              <LuFilePlus2 size={25} />
-              <input
-                ref={clientFileInputRef}
-                type="file"
-                hidden
-                onChange={(e) => handleFileChange(e, "client")}
-              />
-            </div>
-          </div>
-    
-          <div className="w-full flex place-items-center gap-x-4 overflow-x-auto pb-4">
-            {fetchingCompany && "Loading..."}
-            {company.client_documents?.length === 0 && <p>No Documents</p>}
-            {company.client_documents.map(
-              ({ title, document_id, s3_url, created_at }) => (
-                <div
-                  key={document_id}
-                  className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative"
-                >
-                  <IoIosClose
-                    size={40}
-                    className="absolute top-1 right-1"
-                    onClick={() => deleteClientDocument(document_id)}
-                  />
-                  <div
-                    onClick={() => window.open(s3_url)}
-                    className="flex flex-col place-items-center"
-                  >
-                    <FaFile size={60} className="mb-2" />
-                    <p className="max-w-40 truncate">{title}</p>
-                    <p className="text-sm">
-                      Uploaded{" "}
-                      {new Date(created_at + "Z").toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        </div>
-    
-        {/* COMPANY DOCUMENTS */}
-        <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
-          <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
-            <p>Company Documents</p>
-            <div
-              className="cursor-pointer text-blue-600 hover:opacity-80"
-              onClick={() => handleAddClick("company")}
-            >
-              <LuFilePlus2 size={25} />
-              <input
-                ref={companyFileInputRef}
-                type="file"
-                hidden
-                onChange={(e) => handleFileChange(e, "company")}
-              />
-            </div>
-          </div>
-    
-          <div className="w-full flex place-items-center gap-x-4 overflow-x-auto pb-4">
-            {fetchingCompany && "Loading..."}
-            {company.company_documents?.length === 0 && <p>No Documents</p>}
-            {company.company_documents.map(
-              ({ title, document_id, s3_url, created_at }) => (
-                <div
-                  key={document_id}
-                  className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative"
-                >
-                  <IoIosClose
-                    size={40}
-                    className="absolute top-1 right-1"
-                    onClick={() => deleteCompanyDocument(document_id)}
-                  />
-                  <div
-                    onClick={() => window.open(s3_url)}
-                    className="flex flex-col place-items-center"
-                  >
-                    <FaFile size={60} className="mb-2" />
-                    <p className="max-w-40 truncate">{title}</p>
-                    <p className="text-sm">
-                      Uploaded{" "}
-                      {new Date(created_at + "Z").toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        </div>
+      )}
 
-  </div>
+      {/* VIEW MODE SECTION */}
+      {!isEditing && (
+        <div className="w-full">
+          {/* 🔥 RENEW PLAN BUTTON */}
+          <div className="w-full flex justify-end mb-4 pr-4">
+            <button
+              onClick={() =>
+                router.push(`/dashboard/companies/${company_name}/renew`)
+              }
+              className="w-48 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer shadow hover:opacity-90"
+            >
+              Change / Renew Plan
+            </button>
+          </div>
+
+          {/* CLIENT DOCUMENTS */}
           <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
             <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
-              <p>Company Documents</p>
+              <p className="font-semibold">Client Documents</p>
+              <div
+                className="cursor-pointer text-blue-600 hover:opacity-80"
+                onClick={() => handleAddClick("client")}
+              >
+                <LuFilePlus2 size={25} />
+                <input
+                  ref={clientFileInputRef}
+                  type="file"
+                  hidden
+                  onChange={(e) => handleFileChange(e, "client")}
+                />
+              </div>
+            </div>
+
+            <div className="w-full flex place-items-center gap-x-4 overflow-x-auto pb-4">
+              {fetchingCompany && "Loading..."}
+              {company.client_documents?.length === 0 && <p className="text-sm text-gray-400">No Documents</p>}
+              {company.client_documents.map(
+                ({ title, document_id, s3_url, created_at }) => (
+                  <div
+                    key={document_id}
+                    className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative group"
+                  >
+                    <IoIosClose
+                      size={35}
+                      className="absolute top-1 right-1 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => deleteClientDocument(document_id)}
+                    />
+                    <div
+                      onClick={() => window.open(s3_url)}
+                      className="flex flex-col place-items-center"
+                    >
+                      <FaFile size={60} className="mb-2 text-gray-400" />
+                      <p className="max-w-40 truncate text-sm font-medium">{title}</p>
+                      <p className="text-[10px] text-gray-500">
+                        Uploaded{" "}
+                        {new Date(created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* COMPANY DOCUMENTS */}
+          <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
+            <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
+              <p className="font-semibold">Company Documents</p>
               <div
                 className="cursor-pointer text-blue-600 hover:opacity-80"
                 onClick={() => handleAddClick("company")}
@@ -551,29 +504,30 @@ export default function CompanyDetailsPage() {
                 />
               </div>
             </div>
+
             <div className="w-full flex place-items-center gap-x-4 overflow-x-auto pb-4">
               {fetchingCompany && "Loading..."}
-              {company.company_documents?.length === 0 && <p>No Documents</p>}
+              {company.company_documents?.length === 0 && <p className="text-sm text-gray-400">No Documents</p>}
               {company.company_documents.map(
                 ({ title, document_id, s3_url, created_at }) => (
                   <div
                     key={document_id}
-                    className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative"
+                    className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative group"
                   >
                     <IoIosClose
-                      size={40}
-                      className="absolute top-1 right-1"
+                      size={35}
+                      className="absolute top-1 right-1 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => deleteCompanyDocument(document_id)}
                     />
                     <div
                       onClick={() => window.open(s3_url)}
                       className="flex flex-col place-items-center"
                     >
-                      <FaFile size={60} className="mb-2" />
-                      <p className="max-w-40 truncate">{title}</p>
-                      <p className="text-sm">
+                      <FaFile size={60} className="mb-2 text-gray-400" />
+                      <p className="max-w-40 truncate text-sm font-medium">{title}</p>
+                      <p className="text-[10px] text-gray-500">
                         Uploaded{" "}
-                        {new Date(created_at + "Z").toLocaleDateString()}
+                        {new Date(created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -596,7 +550,7 @@ export const Field = ({ type = "text", title, value, onChange, loading }) => {
         type={type}
         value={value}
         onChange={onChange}
-        className="w-full border border-gray-300 p-3 rounded-lg outline-none focus:border-gray-500 bg-[#1F9EBD0F]"
+        className="w-full border border-gray-300 p-3 rounded-lg outline-none focus:border-gray-500 bg-[#1F9EBD0F] disabled:bg-gray-100 disabled:text-gray-500"
         placeholder={"Enter " + title}
       />
     </div>
@@ -610,7 +564,7 @@ export const Dropdown = ({ title, value, onChange, options, loading }) => {
       width: "100%",
       minHeight: "48px",
       padding: "0 4px",
-      backgroundColor: "#1F9EBD0F",
+      backgroundColor: state.isDisabled ? "#F3F4F6" : "#1F9EBD0F",
       borderColor: state.isFocused ? "#6B7280" : "#D1D5DB",
       borderWidth: "1px",
       borderRadius: "0.5rem",
@@ -619,48 +573,14 @@ export const Dropdown = ({ title, value, onChange, options, loading }) => {
         borderColor: "#6B7280",
       },
     }),
-
     valueContainer: (base) => ({
       ...base,
       padding: "0.75rem",
     }),
-
-    input: (base) => ({
-      ...base,
-      margin: 0,
-      padding: 0,
-    }),
-
-    indicatorsContainer: (base) => ({
-      ...base,
-      height: "48px",
-    }),
-
-    indicatorSeparator: () => ({
-      display: "none",
-    }),
-
-    menu: (base) => ({
-      ...base,
-      borderRadius: "0.5rem",
-      border: "1px solid #D1D5DB",
-      boxShadow: "0 4px 6px rgba(0,0,0,0.05)",
-      zIndex: 50,
-    }),
-
-    option: (base, state) => ({
-      ...base,
-      padding: "0.75rem",
-      backgroundColor: state.isFocused ? "#E5E7EB" : "white",
-      color: "#374151",
-      cursor: "pointer",
-    }),
-
     placeholder: (base) => ({
       ...base,
       color: "#9CA3AF",
     }),
-
     singleValue: (base) => ({
       ...base,
       color: "#374151",
