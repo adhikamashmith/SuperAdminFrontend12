@@ -10,7 +10,6 @@ import { FaCheck, FaFile } from "react-icons/fa";
 import { LuFilePlus2 } from "react-icons/lu";
 import dynamic from "next/dynamic";
 const Select = dynamic(() => import("react-select"), { ssr: false });
-const router = useRouter();
 
 import { useParams, useRouter } from "next/navigation";
 
@@ -69,6 +68,7 @@ const loadPaylod = async (
 
 export default function CompanyDetailsPage() {
   const { company_name } = useParams();
+  const router = useRouter();
   const [company, setCompany] = useState({
     company_name: "",
     admin_name: "",
@@ -397,90 +397,144 @@ export default function CompanyDetailsPage() {
           />
         </div>
       </div>
-      {!isEditing && (
-        <div>
-      
-          {/* 🔥 ADD THIS BUTTON RIGHT HERE */}
-          <div className="w-full flex justify-end mb-4">
-            <button
-              onClick={() =>
-                router.push(`/dashboard/companies/${company_name}/renew`)
-              }
-              className="w-48 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer"
-            >
-              Change / Renew Plan
-            </button>
-          </div>
-      
-          <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
-      {isEditing && (
-        <div className="w-full flex place-items-center justify-end gap-x-6">
+
+    {/* EDIT MODE BUTTONS */}
+    {isEditing && (
+      <div className="w-full flex place-items-center justify-end gap-x-6">
+        <button
+          className="w-40 p-3 rounded-lg bg-white border border-[#209CBB] text-[#0e7893] text-center cursor-pointer"
+          onClick={() => {
+            setIsEditing(false);
+            window.location.reload();
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          disabled={loading}
+          onClick={updateCompany}
+          className="w-40 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer"
+        >
+          Update Company
+        </button>
+      </div>
+    )}
+    
+    {/* VIEW MODE SECTION */}
+    {!isEditing && (
+      <div>
+    
+        {/* 🔥 CHANGE / RENEW PLAN BUTTON */}
+        <div className="w-full flex justify-end mb-4">
           <button
-            className="w-40 p-3 rounded-lg bg-white border border-[#209CBB] text-[#0e7893] text-center cursor-pointer"
-            onClick={() => {
-              setIsEditing(false);
-              window.location.reload();
-            }}
+            onClick={() =>
+              router.push(`/dashboard/companies/${company_name}/renew`)
+            }
+            className="w-48 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer"
           >
-            Cancel
-          </button>
-          <button
-            disabled={loading}
-            onClick={updateCompany}
-            className="w-40 p-3 rounded-lg bg-linear-to-r from-[#1B6687] to-[#209CBB] text-white text-center cursor-pointer"
-          >
-            Update Company
+            Change / Renew Plan
           </button>
         </div>
-      )}
-      {!isEditing && (
-        <div>
-          <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
-            <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
-              <p>Client Documents</p>
-              <div
-                className="cursor-pointer text-blue-600 hover:opacity-80"
-                onClick={() => handleAddClick("client")}
-              >
-                <LuFilePlus2 size={25} />
-                <input
-                  ref={clientFileInputRef}
-                  type="file"
-                  hidden
-                  onChange={(e) => handleFileChange(e, "client")}
-                />
-              </div>
-            </div>
-            <div className="w-full flex place-items-center gap-x-4 overflow-x-auto pb-4">
-              {fetchingCompany && "Loading..."}
-              {company.client_documents?.length === 0 && <p>No Documents</p>}
-              {company.client_documents.map(
-                ({ title, document_id, s3_url, created_at }) => (
-                  <div
-                    key={document_id}
-                    className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative"
-                  >
-                    <IoIosClose
-                      size={40}
-                      className="absolute top-1 right-1"
-                      onClick={() => deleteClientDocument(document_id)}
-                    />
-                    <div
-                      onClick={() => window.open(s3_url)}
-                      className="flex flex-col place-items-center"
-                    >
-                      <FaFile size={60} className="mb-2" />
-                      <p className="max-w-40 truncate">{title}</p>
-                      <p className="text-sm">
-                        Uploaded{" "}
-                        {new Date(created_at + "Z").toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                )
-              )}
+    
+        {/* CLIENT DOCUMENTS */}
+        <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
+          <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
+            <p>Client Documents</p>
+            <div
+              className="cursor-pointer text-blue-600 hover:opacity-80"
+              onClick={() => handleAddClick("client")}
+            >
+              <LuFilePlus2 size={25} />
+              <input
+                ref={clientFileInputRef}
+                type="file"
+                hidden
+                onChange={(e) => handleFileChange(e, "client")}
+              />
             </div>
           </div>
+    
+          <div className="w-full flex place-items-center gap-x-4 overflow-x-auto pb-4">
+            {fetchingCompany && "Loading..."}
+            {company.client_documents?.length === 0 && <p>No Documents</p>}
+            {company.client_documents.map(
+              ({ title, document_id, s3_url, created_at }) => (
+                <div
+                  key={document_id}
+                  className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative"
+                >
+                  <IoIosClose
+                    size={40}
+                    className="absolute top-1 right-1"
+                    onClick={() => deleteClientDocument(document_id)}
+                  />
+                  <div
+                    onClick={() => window.open(s3_url)}
+                    className="flex flex-col place-items-center"
+                  >
+                    <FaFile size={60} className="mb-2" />
+                    <p className="max-w-40 truncate">{title}</p>
+                    <p className="text-sm">
+                      Uploaded{" "}
+                      {new Date(created_at + "Z").toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+    
+        {/* COMPANY DOCUMENTS */}
+        <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
+          <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
+            <p>Company Documents</p>
+            <div
+              className="cursor-pointer text-blue-600 hover:opacity-80"
+              onClick={() => handleAddClick("company")}
+            >
+              <LuFilePlus2 size={25} />
+              <input
+                ref={companyFileInputRef}
+                type="file"
+                hidden
+                onChange={(e) => handleFileChange(e, "company")}
+              />
+            </div>
+          </div>
+    
+          <div className="w-full flex place-items-center gap-x-4 overflow-x-auto pb-4">
+            {fetchingCompany && "Loading..."}
+            {company.company_documents?.length === 0 && <p>No Documents</p>}
+            {company.company_documents.map(
+              ({ title, document_id, s3_url, created_at }) => (
+                <div
+                  key={document_id}
+                  className="min-w-50 w-fit h-fit flex flex-col place-items-center p-4 rounded-xl border border-gray-200 cursor-pointer relative"
+                >
+                  <IoIosClose
+                    size={40}
+                    className="absolute top-1 right-1"
+                    onClick={() => deleteCompanyDocument(document_id)}
+                  />
+                  <div
+                    onClick={() => window.open(s3_url)}
+                    className="flex flex-col place-items-center"
+                  >
+                    <FaFile size={60} className="mb-2" />
+                    <p className="max-w-40 truncate">{title}</p>
+                    <p className="text-sm">
+                      Uploaded{" "}
+                      {new Date(created_at + "Z").toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+  </div>
           <div className="w-full rounded-xl mt-4 p-4 border border-gray-200 shadow-sm m-4">
             <div className="w-full flex place-items-center justify-between mb-8 pb-3 border-b border-gray-400">
               <p>Company Documents</p>
