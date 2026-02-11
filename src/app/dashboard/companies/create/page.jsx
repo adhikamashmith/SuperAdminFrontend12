@@ -181,9 +181,9 @@ export default function CreateCompanyPage() {
             title="Status"
             options={[
               { label: "Active", value: "Active" },
-              { label: "In Progress", value: "In Progress" },
+              // { label: "In Progress", value: "In Progress" },
               { label: "Inactive", value: "Inactive" },
-              { label: "Some Other Status", value: "Some Other Status" },
+              // { label: "Some Other Status", value: "Some Other Status" },
             ]}
             value={
               payload.status
