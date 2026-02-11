@@ -94,7 +94,6 @@ export default function CompanyDetailsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
   
-  // State to hold the selected plan in the Renew section
   const [selectedPlan, setSelectedPlan] = useState(null);
 
   const clientFileInputRef = useRef(null);
@@ -105,7 +104,6 @@ export default function CompanyDetailsPage() {
     loadPaylod(company_name, setCompany, setFetchingCompany, setPlans, setFetchingPlans);
   }, [company_name]);
 
-  // Sync selectedPlan state when company data loads
   useEffect(() => {
     if (company.plan_name) {
       setSelectedPlan({ label: company.plan_name, value: company.plan_name });
@@ -145,7 +143,6 @@ export default function CompanyDetailsPage() {
     }
   };
 
-  // --- LOGIC: UPDATE PROFILE (Admin details, Status, Dates) ---
   const updateCompany = async () => {
     const requiredFields = ["admin_name", "admin_email", "country", "status", "start_date", "end_date"];
     for (const key of requiredFields) {
@@ -154,7 +151,6 @@ export default function CompanyDetailsPage() {
 
     setUpdatingCompany(true);
     try {
-      // Strictly profile fields only
       const payload = {
         admin_name: company.admin_name,
         admin_email: company.admin_email,
@@ -181,7 +177,6 @@ export default function CompanyDetailsPage() {
     }
   };
 
-  // --- LOGIC: RENEW / CHANGE PLAN ONLY ---
   const handleRenewPlan = async () => {
     if (!selectedPlan) return alert("Please select a plan");
     setRenewingPlan(true);
@@ -244,13 +239,13 @@ export default function CompanyDetailsPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-10">
-          {/* Company Name: Readable but un-editable. No dark background. */}
-          <div>
-            <p className="font-semibold mb-2">Company Name</p>
-            <div className="w-full p-3 rounded-lg border border-transparent bg-white text-gray-900 font-medium">
-              {company.company_name}
-            </div>
-          </div>
+          {/* Company Name: Locked to read-only but looks like a normal white field */}
+          <Field
+            loading={true}
+            title="Company Name"
+            value={company.company_name}
+            onChange={() => {}}
+          />
 
           <Field
             loading={!isEditing || updatingCompany}
@@ -328,7 +323,6 @@ export default function CompanyDetailsPage() {
         <p className="mt-4 text-xs text-gray-500 italic">* Note: Plan changes take effect immediately and may update the expiry date.</p>
       </div>
 
-      {/* --- DIV 3: DOCUMENTS --- */}
       <div className="space-y-6">
         <DocumentSection
           title="Client Documents"
@@ -361,8 +355,10 @@ const Field = ({ type = "text", title, value, onChange, loading }) => (
       type={type}
       value={value}
       onChange={onChange}
-      className={`w-full border border-gray-300 p-3 rounded-lg outline-none focus:border-[#1B6687] ${
-        loading ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-[#1F9EBD0F]"
+      className={`w-full border border-gray-300 p-3 rounded-lg outline-none ${
+        loading 
+          ? "bg-white text-gray-900 cursor-default" 
+          : "bg-[#1F9EBD0F] focus:border-[#1B6687]"
       }`}
       placeholder={"Enter " + title}
     />
