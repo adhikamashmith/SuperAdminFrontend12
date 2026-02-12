@@ -405,8 +405,15 @@ const DocumentSection = ({ title, docs, onDelete, fileRef, onFileChange }) => (
             className="absolute top-1 right-1 text-red-500 cursor-pointer opacity-0 group-hover:opacity-100"
             onClick={() => onDelete(doc.document_id)}
           />
-          <FaFile size={40} className="text-gray-400 mb-2" />
-          <p className="text-xs font-medium text-center truncate w-full">{doc.title}</p>
+          <a
+            href={doc.file_url}      // <-- Make sure your backend sends 'file_url'
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col items-center"
+          >
+            <FaFile size={40} className="text-gray-400 mb-2" />
+            <p className="text-xs font-medium text-center truncate w-full">{doc.title}</p>
+          </a>
         </div>
       ))}
     </div>
