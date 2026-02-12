@@ -327,18 +327,16 @@ export default function CompanyDetailsPage() {
         <DocumentSection
           title="Client Documents"
           docs={company.client_documents}
-          onAdd={() => handleAddClick("client")}
-          onDelete={(id) => deleteDocument("client", id)}
           fileRef={clientFileInputRef}
           onFileChange={(e) => handleFileChange(e, "client")}
+          onDelete={(id) => deleteDocument("client", id)}
         />
         <DocumentSection
           title="Company Documents"
           docs={company.company_documents}
-          onAdd={() => handleAddClick("company")}
-          onDelete={(id) => deleteDocument("company", id)}
           fileRef={companyFileInputRef}
           onFileChange={(e) => handleFileChange(e, "company")}
+          onDelete={(id) => deleteDocument("company", id)}
         />
       </div>
     </div>
@@ -383,18 +381,30 @@ const Dropdown = ({ title, value, onChange, options, loading }) => {
   );
 };
 
-const DocumentSection = ({ title, docs, onAdd, onDelete, fileRef, onFileChange }) => (
+const DocumentSection = ({ title, docs, onDelete, fileRef, onFileChange }) => (
   <div className="w-full rounded-xl p-6 border border-gray-200 shadow-sm bg-white">
     <div className="flex justify-between items-center mb-6 border-b pb-2">
       <p className="font-bold">{title}</p>
-      <button onClick={onAdd} className="text-blue-600"><LuFilePlus2 size={25} /></button>
-      <input ref={fileRef} type="file" hidden onChange={onFileChange} />
+
+      {/* Label wraps the icon and hidden input */}
+      <label className="text-blue-600 cursor-pointer">
+        <LuFilePlus2 size={25} />
+        <input ref={fileRef} type="file" hidden onChange={onFileChange} />
+      </label>
     </div>
+
     <div className="flex gap-4 overflow-x-auto pb-2">
       {docs?.length === 0 && <p className="text-sm text-gray-400">No documents uploaded.</p>}
       {docs?.map((doc) => (
-        <div key={doc.document_id} className="min-w-[150px] p-4 border rounded-xl flex flex-col items-center relative group bg-gray-50">
-          <IoIosClose size={24} className="absolute top-1 right-1 text-red-500 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => onDelete(doc.document_id)} />
+        <div
+          key={doc.document_id}
+          className="min-w-[150px] p-4 border rounded-xl flex flex-col items-center relative group bg-gray-50"
+        >
+          <IoIosClose
+            size={24}
+            className="absolute top-1 right-1 text-red-500 cursor-pointer opacity-0 group-hover:opacity-100"
+            onClick={() => onDelete(doc.document_id)}
+          />
           <FaFile size={40} className="text-gray-400 mb-2" />
           <p className="text-xs font-medium text-center truncate w-full">{doc.title}</p>
         </div>
@@ -402,3 +412,4 @@ const DocumentSection = ({ title, docs, onAdd, onDelete, fileRef, onFileChange }
     </div>
   </div>
 );
+
